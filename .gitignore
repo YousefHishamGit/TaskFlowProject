@@ -1,0 +1,8 @@
+# .NET / Visual Studio
+[Oo]bj/
+[Bb]in/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates

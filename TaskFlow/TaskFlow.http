@@ -1,0 +1,182 @@
+@TaskFlow_HostAddress = http://localhost:5209
+
+### ====================================================================
+### 1. AUTH ENDPOINTS
+### ====================================================================
+
+### 1.1 Register User 1 (Project Owner)
+# @name registerOwner
+POST {{TaskFlow_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Ahmed Owner",
+  "email": "owner@taskflow.com",
+  "password": "Password123!"
+}
+
+### 1.2 Register User 2 (Team Member)
+# @name registerMember
+POST {{TaskFlow_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Sara Member",
+  "email": "sara@taskflow.com",
+  "password": "Password123!"
+}
+
+### 1.3 Login as Owner
+# @name loginOwner
+POST {{TaskFlow_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@taskflow.com",
+  "password": "Password123!"
+}
+
+### Extract token from login response
+@authToken = {{loginOwner.response.body.token}}
+
+### 1.4 Get Current Authenticated User (Me)
+GET {{TaskFlow_HostAddress}}/api/auth/me
+Authorization: Bearer {{authToken}}
+
+
+### ====================================================================
+### 2. PROJECTS ENDPOINTS
+### ====================================================================
+
+### 2.1 Create a New Project
+# @name createProject
+POST {{TaskFlow_HostAddress}}/api/projects
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "E-Commerce Platform",
+  "description": "Building a full-stack e-commerce solution."
+}
+
+### Store created Project ID
+@projectId = {{createProject.response.body.id}}
+
+### 2.2 Get My Projects (with pagination)
+GET {{TaskFlow_HostAddress}}/api/projects?page=1&pageSize=10
+Authorization: Bearer {{authToken}}
+
+### 2.3 Get Project by ID
+GET {{TaskFlow_HostAddress}}/api/projects/{{projectId}}
+Authorization: Bearer {{authToken}}
+
+### 2.4 Update Project
+PUT {{TaskFlow_HostAddress}}/api/projects/{{projectId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "E-Commerce Platform V2",
+  "description": "Updated project description with latest requirements."
+}
+
+### 2.5 Add Member to Project (User 2 - Sara)
+POST {{TaskFlow_HostAddress}}/api/projects/{{projectId}}/members
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "email": "sara@taskflow.com"
+}
+
+### Store Sara's User ID (obtained from Sara's register response)
+@memberUserId = {{registerMember.response.body.user.id}}
+
+### 2.6 Remove Member from Project (Run when needed)
+# DELETE {{TaskFlow_HostAddress}}/api/projects/{{projectId}}/members/{{memberUserId}}
+# Authorization: Bearer {{authToken}}
+
+
+### ====================================================================
+### 3. TASKS ENDPOINTS
+### ====================================================================
+
+### 3.1 Create Task in Project
+# @name createTask
+POST {{TaskFlow_HostAddress}}/api/projects/{{projectId}}/tasks
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "title": "Design Database Schema",
+  "description": "Design ERD and entity configurations for EF Core",
+  "priority": 3,
+  "dueDate": "2026-12-31T23:59:59Z"
+}
+
+### Store created Task ID
+@taskId = {{createTask.response.body.id}}
+
+### 3.2 Get Tasks (Gridify Filtering, Sorting, Pagination)
+GET {{TaskFlow_HostAddress}}/api/tasks?page=1&pageSize=10&orderBy=createdAt desc
+Authorization: Bearer {{authToken}}
+
+### 3.3 Get Task by ID
+GET {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}
+Authorization: Bearer {{authToken}}
+
+### 3.4 Update Task
+PUT {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "title": "Design Database Schema & Entities",
+  "description": "Updated description with auditing and relations",
+  "priority": 4,
+  "dueDate": "2026-12-31T23:59:59Z"
+}
+
+### 3.5 Change Task Status (Todo -> InProgress)
+PATCH {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "InProgress"
+}
+
+### 3.6 Change Task Status (InProgress -> Done)
+PATCH {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "Done"
+}
+
+### 3.7 Assign Task to Team Member
+PATCH {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}/assignee
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assigneeId": "{{memberUserId}}"
+}
+
+### 3.8 Unassign Task
+PATCH {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}/assignee
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "assigneeId": null
+}
+
+### 3.9 Delete Task
+DELETE {{TaskFlow_HostAddress}}/api/tasks/{{taskId}}
+Authorization: Bearer {{authToken}}
+
+### 2.7 Delete Project (Cleanup)
+# DELETE {{TaskFlow_HostAddress}}/api/projects/{{projectId}}
+# Authorization: Bearer {{authToken}}
