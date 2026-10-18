@@ -1,12 +1,15 @@
 
+using Serilog;
 using TaskFlow.Api.Extensions;
 using TaskFlow.Api.Filters;
 using TaskFlow.Api.Middleware;
 using TaskFlow.Api.Services;
 using TaskFlow.Application;
 using TaskFlow.Application.Common.Interfaces;
+using TaskFlow.Extensions;
 using TaskFlow.Hubs;
 using TaskFlow.Infrastructure;
+using TaskFlow.Middleware;
 using TaskFlow.Services;
 
 namespace TaskFlow
@@ -40,6 +43,10 @@ namespace TaskFlow
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<INotificationService, NotificationService>();
 
+            builder.Host.UseSerilog((context, services, configuration) => configuration
+                    .ReadFrom.Configuration(context.Configuration)
+                    .ReadFrom.Services(services));
+                
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -48,12 +55,21 @@ namespace TaskFlow
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            app.UseSerilogRequestLogging(options =>
+            {
+                options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+                {
+                    diagnosticContext.Set("UserId", httpContext.GetLogUserId());
+                };
+            });
+            
             app.MapHub<NotificationsHub>("/hubs/notifications");
             app.UseExceptionHandler();
             app.UseHttpsRedirection();
 
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseMiddleware<LogContextMiddleware>();
 
 
             app.MapControllers();

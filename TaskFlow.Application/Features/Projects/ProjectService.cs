@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,11 +20,14 @@ namespace TaskFlow.Application.Features.Projects
         private readonly IApplicationDbContext _context;
         private readonly ICurrentUser _CurUser;
         private readonly ICacheService _cacheService;
-        public ProjectService(IApplicationDbContext context,ICurrentUser CurUser, ICacheService cacheService)
+        private readonly ILogger<ProjectService> _logger;
+        public ProjectService(IApplicationDbContext context,ICurrentUser CurUser, ICacheService cacheService
+            , ILogger<ProjectService> logger)
         {
             _context = context;
             _CurUser = CurUser;
             _cacheService = cacheService;
+            _logger = logger;
 
         }
         public async Task<ProjectDto> CreateAsync(CreateProjectRequest request, CancellationToken cancellationToken = default)
@@ -31,6 +35,7 @@ namespace TaskFlow.Application.Features.Projects
             var newPro = new Project(request.Name, request.Description, _CurUser.UserId);
             _context.Projects.Add(newPro);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Project created successfully with ProjectId {ProjectId}", newPro.Id);
             return new ProjectDto
             (
               newPro.Id,
@@ -70,6 +75,7 @@ namespace TaskFlow.Application.Features.Projects
 
             _context.Projects.Remove(pro);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Project deleted successfully with ProjectId {ProjectId}", pro.Id);
             var cacheKey = CacheKeys.GetProjectStatsKey(id);
             await _cacheService.RemoveAsync(cacheKey, cancellationToken);
         }
@@ -186,6 +192,7 @@ namespace TaskFlow.Application.Features.Projects
 
             proj.Update(request.Name, request.Description);
             await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Project updated successfully with ProjectId {ProjectId}", proj.Id);
             var memberCount = await _context.ProjectMembers.CountAsync(m => m.ProjectId == id, cancellationToken);
             return new ProjectDto(
                             proj.Id,
@@ -236,6 +243,7 @@ namespace TaskFlow.Application.Features.Projects
             project.AddMember(targetUserId.Value);
 
             await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Member added to project. ProjectId {ProjectId}, MemberId {MemberId}", projectId, targetUserId);
         }
 
         public async Task RemoveMemberAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
@@ -262,6 +270,7 @@ namespace TaskFlow.Application.Features.Projects
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Member removed from project. ProjectId {ProjectId}, MemberId {MemberId}", projectId, userId);
         }
         private static ProjectDto ToDto(Project project)
         {

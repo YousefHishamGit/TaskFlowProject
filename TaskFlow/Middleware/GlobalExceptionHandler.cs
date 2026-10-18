@@ -2,7 +2,8 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Application.Common.Exceptions;
-using TaskFlow.Domain.Exceptions; 
+using TaskFlow.Domain.Exceptions;
+using TaskFlow.Extensions;
 
 namespace TaskFlow.Api.Middleware
 {
@@ -20,6 +21,12 @@ namespace TaskFlow.Api.Middleware
             Exception exception,
             CancellationToken cancellationToken)
         {
+            var userId = httpContext.GetLogUserId();
+
+            using (_logger.BeginScope(new Dictionary<string, object> { ["UserId"] = userId }))
+            {
+                _logger.LogError( "An unhandled exception occurred.");
+            }
 
             if (exception is ValidationException validationException)
             {

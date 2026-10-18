@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Domain.Entities;
@@ -12,18 +13,21 @@ namespace TaskFlow.Application.Features.Auth
         private readonly IPasswordHasher _passwordHasher;
         private readonly IJwtTokenService _jwtTokenService;
         private readonly ICurrentUser _currentUser;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             IApplicationDbContext context,
             IPasswordHasher passwordHasher,
             IJwtTokenService jwtTokenService,
-            ICurrentUser currentUser)
+            ICurrentUser currentUser, ILogger<AuthService> logger)
         {
             _context = context;
             _passwordHasher = passwordHasher;
             _jwtTokenService = jwtTokenService;
             _currentUser = currentUser;
+            _logger= logger;
         }
+
 
         public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
         {
@@ -53,8 +57,9 @@ namespace TaskFlow.Application.Features.Auth
             
             _context.Users.Add(user);
             await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("New user registered successfully with UserId {UserId}", user.Id);
 
-         
+
             var token = _jwtTokenService.GenerateToken(user);
             var userDto = ToDto(user);
 
@@ -65,6 +70,7 @@ namespace TaskFlow.Application.Features.Auth
         {
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
             {
+                _logger.LogWarning("Failed login attempt.");
                 throw new UnauthorizedException("Invalid email or password");
             }
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -73,16 +79,19 @@ namespace TaskFlow.Application.Features.Auth
                                 .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
             if (user is null)
             {
+                _logger.LogWarning("Failed login attempt.");
                 throw new UnauthorizedException("Invalid email or password");
             }
             var isPasswordValid = _passwordHasher.Verify(request.Password, user.PasswordHash);
 
             if (!isPasswordValid)
             {
+                _logger.LogWarning("Failed login attempt.");
                 throw new UnauthorizedException("Invalid email or password");
             }
             var token = _jwtTokenService.GenerateToken(user);
             var userDto = ToDto(user);
+            _logger.LogInformation("User logged in successfully with UserId {UserId}", user.Id);
 
             return new AuthResponse(token, userDto);
         }
