@@ -6,7 +6,7 @@ namespace TaskFlow.Application.Features.Projects
     {
         Task<ProjectDto> CreateAsync(CreateProjectRequest request, CancellationToken cancellationToken = default);
 
-        Task<ProjectDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<ProjectDetailsDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
         Task<PagedResult<ProjectDto>> GetMyProjectsAsync(int page, int pageSize, CancellationToken cancellationToken = default);
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using TaskFlow.Application.Common;
 using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Application.Common.Models;
@@ -17,10 +18,12 @@ namespace TaskFlow.Application.Features.Projects
     {
         private readonly IApplicationDbContext _context;
         private readonly ICurrentUser _CurUser;
-        public ProjectService(IApplicationDbContext context,ICurrentUser CurUser)
+        private readonly ICacheService _cacheService;
+        public ProjectService(IApplicationDbContext context,ICurrentUser CurUser, ICacheService cacheService)
         {
             _context = context;
             _CurUser = CurUser;
+            _cacheService = cacheService;
 
         }
         public async Task<ProjectDto> CreateAsync(CreateProjectRequest request, CancellationToken cancellationToken = default)
@@ -67,16 +70,71 @@ namespace TaskFlow.Application.Features.Projects
 
             _context.Projects.Remove(pro);
             await _context.SaveChangesAsync();
+            var cacheKey = CacheKeys.GetProjectStatsKey(id);
+            await _cacheService.RemoveAsync(cacheKey, cancellationToken);
         }
-        public async Task<ProjectDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        public async Task<ProjectDetailsDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var pro = await _context.Projects
-                            .Include(p => p.Members)
-                            .SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
-            if (pro is null) throw new NotFoundException($"This project by {id} is not Found ");
-            return  ToDto(pro);
+            var userId = _CurUser.UserId;
+            if (userId == null || userId==Guid.Empty)
+            {
+                throw new UnauthorizedException("not Authorize for this");
 
-                
+            }
+            
+
+            var project = await _context.Projects
+                .Where(p => p.Id == id) 
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    p.Description,
+                    p.OwnerId,
+                    MemberCount = p.Members.Count,
+                    p.CreatedAt,
+                    p.UpdatedAt
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (project == null)
+                throw new NotFoundException("Project not found.");
+
+            var cacheKey = CacheKeys.GetProjectStatsKey(id);
+            var statsDto = await _cacheService.GetAsync<ProjectStatsDto>(cacheKey, cancellationToken);
+            if (statsDto == null)
+            {
+
+                var taskStats = await _context.TaskItems
+                .AsNoTracking()
+                .Where(t => t.ProjectId == id)
+                .GroupBy(t => t.Status)
+                .Select(g => new
+                {
+                    Status = g.Key,
+                    Count = g.Count()
+                })
+                .ToListAsync(cancellationToken);
+
+                int todoCount = taskStats.FirstOrDefault(s => s.Status == TaskItemStatus.Todo)?.Count ?? 0;
+                int inProgressCount = taskStats.FirstOrDefault(s => s.Status == TaskItemStatus.InProgress)?.Count ?? 0;
+                int doneCount = taskStats.FirstOrDefault(s => s.Status == TaskItemStatus.Done)?.Count ?? 0;
+                int totalCount = todoCount + inProgressCount + doneCount;
+
+                 statsDto = new ProjectStatsDto(todoCount, inProgressCount, doneCount, totalCount);
+                await _cacheService.SetAsync(cacheKey, statsDto, CacheKeys.DefaultExpiration, cancellationToken);
+            }
+          
+            return new ProjectDetailsDto(
+                project.Id,
+                project.Name,
+                project.Description,
+                project.OwnerId,
+                project.MemberCount,
+                project.CreatedAt,
+                project.UpdatedAt,
+                statsDto
+            );
         }
 
         public async Task<PagedResult<ProjectDto>> GetMyProjectsAsync(int page, int pageSize, CancellationToken cancellationToken = default)

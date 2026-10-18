@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaskFlow.Application.Common;
 using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Common.Interfaces;
 using TaskFlow.Application.Common.Models;
@@ -14,6 +15,7 @@ using TaskFlow.Application.Features.Tasks.Gridify;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
 using TaskFlow.Domain.Exceptions;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace TaskFlow.Application.Features.Tasks
 {
@@ -21,11 +23,13 @@ namespace TaskFlow.Application.Features.Tasks
     {
         private readonly IApplicationDbContext _dbContext;
         private readonly ICurrentUser _currentUser;
+        private readonly ICacheService _cacheService;
 
-        public TaskService(IApplicationDbContext dbContext, ICurrentUser currentUser)
+        public TaskService(IApplicationDbContext dbContext, ICurrentUser currentUser, ICacheService cacheService)
         {
             _dbContext = dbContext;
             _currentUser = currentUser;
+            _cacheService = cacheService;
         }
 
         public async Task<TaskDto> CreateAsync(Guid projectId, CreateTaskRequest request, CancellationToken cancellationToken = default)
@@ -57,7 +61,10 @@ namespace TaskFlow.Application.Features.Tasks
             _dbContext.TaskItems.Add(taskItem);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-           
+            var cacheKey = CacheKeys.GetProjectStatsKey(projectId);
+            await _cacheService.RemoveAsync(cacheKey, cancellationToken);
+
+
             return MapToDto(taskItem);
         }
 
@@ -185,8 +192,10 @@ namespace TaskFlow.Application.Features.Tasks
 
     
             await _dbContext.SaveChangesAsync(cancellationToken);
+            var cacheKey = CacheKeys.GetProjectStatsKey(taskItem.ProjectId);
+            await _cacheService.RemoveAsync(cacheKey, cancellationToken);
 
-    
+
             return MapToDto(taskItem, taskItem.Assignee?.FullName);
         }
         public async Task<TaskDto> AssignAsync(Guid id, AssignTaskRequest request, CancellationToken cancellationToken = default)
@@ -269,7 +278,10 @@ namespace TaskFlow.Application.Features.Tasks
             }
 
             _dbContext.TaskItems.Remove(taskItem);
+
             await _dbContext.SaveChangesAsync(cancellationToken);
+            var cacheKey = CacheKeys.GetProjectStatsKey(taskItem.ProjectId);
+            await _cacheService.RemoveAsync(cacheKey, cancellationToken);
         }
 
 

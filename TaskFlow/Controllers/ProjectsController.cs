@@ -40,9 +40,9 @@ namespace TaskFlow.Api.Controllers
         }
 
         [HttpGet("{id:guid}")]
-        public async Task<ActionResult<ProjectDto>> GetByIdAsync(
-            Guid id,
-            CancellationToken cancellationToken)
+        public async Task<ActionResult<ProjectDetailsDto>> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
         {
             var project = await _projectService.GetByIdAsync(id, cancellationToken);
             return Ok(project);
