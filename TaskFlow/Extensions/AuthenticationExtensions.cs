@@ -9,7 +9,6 @@ namespace TaskFlow.Api.Extensions
     {
         public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
-            
             var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
 
             if (jwtSettings == null || string.IsNullOrWhiteSpace(jwtSettings.Secret))
@@ -22,7 +21,6 @@ namespace TaskFlow.Api.Extensions
                 throw new InvalidOperationException("Jwt Secret must be at least 32 characters long.");
             }
 
-           
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -43,8 +41,24 @@ namespace TaskFlow.Api.Extensions
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
 
-
                     ClockSkew = TimeSpan.FromMinutes(5)
+                };
+
+               
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
                 };
             });
 

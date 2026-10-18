@@ -23,8 +23,4 @@
     <ProjectReference Include="..\TaskFlow.Infrastructure\TaskFlow.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Hubs\" />
-  </ItemGroup>
-
 </Project>

@@ -5,7 +5,9 @@ using TaskFlow.Api.Middleware;
 using TaskFlow.Api.Services;
 using TaskFlow.Application;
 using TaskFlow.Application.Common.Interfaces;
+using TaskFlow.Hubs;
 using TaskFlow.Infrastructure;
+using TaskFlow.Services;
 
 namespace TaskFlow
 {
@@ -35,6 +37,9 @@ namespace TaskFlow
                 options.Filters.Add<ValidationFilter>();
             });
 
+            builder.Services.AddSignalR();
+            builder.Services.AddSingleton<INotificationService, NotificationService>();
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -43,6 +48,7 @@ namespace TaskFlow
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            app.MapHub<NotificationsHub>("/hubs/notifications");
             app.UseExceptionHandler();
             app.UseHttpsRedirection();
 
